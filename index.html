@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tetris</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #game-container {
+            position: relative;
+        }
+
+        #tetris {
+            border: 2px solid #333;
+            background-color: #000;
+        }
+
+        #score {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            color: #fff;
+            font-size: 20px;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff0000;
+            font-size: 48px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score">Score: 0</div>
+        <canvas id="tetris" width="300" height="600"></canvas>
+        <div id="game-over" class="game-over">
+            Game Over!<br>
+            <span id="final-score">0</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('tetris');
+        const context = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+
+        const BLOCK_SIZE = 30;
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+
+        // Tetromino shapes and colors
+        const SHAPES = {
+            I: [[1, 1, 1, 1]], 
+            J: [[1, 0, 0], [1, 1, 1]],
+            L: [[0, 0, 1], [1, 1, 1]],
+            O: [[1, 1], [1, 1]],
+            S: [[0, 1, 1], [1, 1, 0]],
+            T: [[0, 1, 0], [1, 1, 1]],
+            Z: [[1, 1, 0], [0, 1, 1]]
+        };
+
+        const COLORS = {
+            I: '#00f0f0',
+            J: '#0000f0',
+            L: '#f0a000',
+            O: '#f0f000',
+            S: '#00f000',
+            T: '#a000f0',
+            Z: '#f00000'
+        };
+
+        let board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+        let score = 0;
+        let gameLoop;
+        let currentPiece = null;
+        let gameOver = false;
+
+        function createPiece() {
+            const pieces = Object.keys(SHAPES);
+            const piece = pieces[Math.floor(Math.random() * pieces.length)];
+            return {
+                shape: SHAPES[piece],
+                color: COLORS[piece],
+                x: Math.floor(BOARD_WIDTH / 2) - Math.floor(SHAPES[piece][0].length / 2),
+                y: 0
+            };
+        }
+
+        function draw() {
+            context.fillStyle = '#000';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw board
+            for (let y = 0; y < BOARD_HEIGHT; y++) {
+                for (let x = 0; x < BOARD_WIDTH; x++) {
+                    if (board[y][x]) {
+                        context.fillStyle = board[y][x];
+                        context.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                    }
+                }
+            }
+
+            // Draw current piece
+            if (currentPiece) {
+                context.fillStyle = currentPiece.color;
+                for (let y = 0; y < currentPiece.shape.length; y++) {
+                    for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                        if (currentPiece.shape[y][x]) {
+                            context.fillRect(
+                                (currentPiece.x + x) * BLOCK_SIZE,
+                                (currentPiece.y + y) * BLOCK_SIZE,
+                                BLOCK_SIZE - 1,
+                                BLOCK_SIZE - 1
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        function collision() {
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        const newX = currentPiece.x + x;
+                        const newY = currentPiece.y + y;
+                        if (
+                            newX < 0 ||
+                            newX >= BOARD_WIDTH ||
+                            newY >= BOARD_HEIGHT ||
+                            (newY >= 0 && board[newY][newX])
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge() {
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x]) {
+                        board[currentPiece.y + y][currentPiece.x + x] = currentPiece.color;
+                    }
+                }
+            }
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(BOARD_WIDTH).fill(0));
+                    linesCleared++;
+                    y++;
+                }
+            }
+            if (linesCleared > 0) {
+                score += linesCleared * 100;
+                scoreElement.textContent = `Score: ${score}`;
+            }
+        }
+
+        function rotate() {
+            if (!currentPiece) return;
+
+            const oldShape = currentPiece.shape;
+            const newShape = Array(oldShape[0].length).fill()
+                .map(() => Array(oldShape.length).fill(0));
+
+            // Rotate the shape matrix
+            for (let y = 0; y < oldShape.length; y++) {
+                for (let x = 0; x < oldShape[y].length; x++) {
+                    newShape[x][oldShape.length - 1 - y] = oldShape[y][x];
+                }
+            }
+
+            // Try to rotate and adjust position
+            currentPiece.shape = newShape;
+            const originalX = currentPiece.x;
+            currentPiece.x = Math.max(0, Math.min(currentPiece.x, BOARD_WIDTH - newShape[0].length));
+
+            if (collision()) {
+                // If rotation causes collision, revert the rotation
+                currentPiece.shape = oldShape;
+                currentPiece.x = originalX;
+            } else {
+                // Keep the new shape
+                currentPiece.shape = newShape;
+            }
+        }
+
+        function update() {
+            if (!currentPiece) {
+                currentPiece = createPiece();
+                if (collision()) {
+                    gameOver = true;
+                    gameOverElement.style.display = 'block';
+                    finalScoreElement.textContent = score;
+                    return;
+                }
+            }
+
+            if (!gameOver) {
+                currentPiece.y++;
+                if (collision()) {
+                    currentPiece.y--;
+                    merge();
+                    clearLines();
+                    currentPiece = null;
+                }
+                draw();
+            }
+        }
+
+        document.addEventListener('keydown', event => {
+            if (gameOver) return;
+
+            switch (event.key) {
+                case 'ArrowLeft':
+                    currentPiece.x--;
+                    if (collision()) currentPiece.x++;
+                    break;
+                case 'ArrowRight':
+                    currentPiece.x++;
+                    if (collision()) currentPiece.x--;
+                    break;
+                case 'ArrowDown':
+                    currentPiece.y++;
+                    if (collision()) currentPiece.y--;
+                    update();
+                    break;
+                case 'ArrowUp':
+                    rotate();
+                    draw();
+                    break;
+            }
+            draw();
+        });
+
+        // Start game
+        gameLoop = setInterval(update, 1000);
+    </script>
+</body>
+</html>

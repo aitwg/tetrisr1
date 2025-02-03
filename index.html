@@ -6,20 +6,34 @@
         body {
             background-color: #1a1a1a;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
+            touch-action: none;
+        }
+
+        #banner {
+            position: relative;
+            top: 10px;
+            color: #fff;
+            font-size: 30px;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
         }
 
         #game-container {
             position: relative;
+            margin-top: 20px;
         }
 
         #tetris {
             border: 2px solid #333;
             background-color: #000;
+            margin-bottom: 20px;
         }
 
         #score {
@@ -28,6 +42,7 @@
             left: 0;
             color: #fff;
             font-size: 20px;
+            z-index: 1;
         }
 
         .game-over {
@@ -40,9 +55,29 @@
             text-align: center;
             display: none;
         }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            background-color: #333;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
     </style>
 </head>
 <body>
+    <div id="banner">TETRIS</div>
     <div id="game-container">
         <div id="score">Score: 0</div>
         <canvas id="tetris" width="300" height="600"></canvas>
@@ -50,6 +85,13 @@
             Game Over!<br>
             <span id="final-score">0</span>
         </div>
+    </div>
+
+    <div id="controls">
+        <button class="control-btn" id="left-btn">←</button>
+        <button class="control-btn" id="down-btn">↓</button>
+        <button class="control-btn" id="right-btn">→</button>
+        <button class="control-btn" id="rotate-btn">↻</button>
     </div>
 
     <script>
@@ -231,6 +273,50 @@
             }
         }
 
+        // Button click handlers
+        document.getElementById('left-btn').addEventListener('click', () => {
+            if (!gameOver) {
+                currentPiece.x--;
+                if (collision()) currentPiece.x++;
+                draw();
+            }
+        });
+
+        document.getElementById('right-btn').addEventListener('click', () => {
+            if (!gameOver) {
+                currentPiece.x++;
+                if (collision()) currentPiece.x--;
+                draw();
+            }
+        });
+
+        document.getElementById('down-btn').addEventListener('click', () => {
+            if (!gameOver) {
+                currentPiece.y++;
+                if (collision()) currentPiece.y--;
+                update();
+            }
+        });
+
+        document.getElementById('rotate-btn').addEventListener('click', () => {
+            if (!gameOver) {
+                rotate();
+                draw();
+            }
+        });
+
+        // Touch controls
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+
+            // Simple touch controls (optional)
+            // You can implement more sophisticated touch controls here
+        });
+
+        // Keyboard controls
         document.addEventListener('keydown', event => {
             if (gameOver) return;
 
